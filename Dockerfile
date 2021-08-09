@@ -3,8 +3,8 @@ ARG FABRIC_STARTER_VERSION
 
 ARG USE_EXTERNAL_ADMIN_WEBAPP
 
-FROM ${DOCKER_REGISTRY:-docker.io}/olegabu/fabric-tools-extended:${FABRIC_STARTER_VERSION:-latest} as fabrictools
-FROM ${DOCKER_REGISTRY:-docker.io}/olegabu/fabric-starter-rest:${FABRIC_STARTER_VERSION:-latest}-base as external_admin_webapp_false
+FROM ${DOCKER_REGISTRY:-docker.io}/olegabu/fabric-tools-extended:${FABRIC_STARTER_VERSION:-baas-test} as fabrictools
+FROM ${DOCKER_REGISTRY:-docker.io}/olegabu/fabric-starter-rest:${FABRIC_STARTER_VERSION:-baas-test}-base as external_admin_webapp_false
 
 LABEL MAINTAINER=olegabu
 
