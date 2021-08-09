@@ -41,26 +41,26 @@ class GostCryptoSuite extends api.CryptoSuite {
      * @throws Will throw an error if not implemented
      */
     generateKey(opts) {
-        //throw Error("Not implemented yet!")
-        logger.debug(`Generating new key, options:\n${opts}\n`);
-        let store = opts ? (opts.ephemeral === false ? this._cryptoKeyStore : undefined) : undefined;
-        return gostCrypto.subtle.generateKey(GOST_R_34_10, true, ['sign', 'verify'])
-            .then(keyPair => {
-                logger.debug(`Generated keyPair: ${JSON.stringify(keyPair)}`);
-                return gostCrypto.subtle.exportKey('raw', keyPair.privateKey);
-            })
-            .then(privateKey => {
-                logger.debug(`Extracted private key: ${JSON.stringify(privateKey)}`);
-               let theKey = new GOSTKey(privateKey, "private");
-                if (store) {
-                    return store._getKeyStore()
-                        .then(ks => {
-                            ks.putKey(theKey);
-                            return theKey;
-                        });
-                }
-                return theKey;
-            });
+        throw Error("Not implemented yet!")
+        // logger.debug(`Generating new key, options:\n${opts}\n`);
+        // let store = opts ? (opts.ephemeral === false ? this._cryptoKeyStore : undefined) : undefined;
+        // return gostCrypto.subtle.generateKey(GOST_R_34_10, true, ['sign', 'verify'])
+        //     .then(keyPair => {
+        //         logger.debug(`Generated keyPair: ${JSON.stringify(keyPair)}`);
+        //         return gostCrypto.subtle.exportKey('raw', keyPair.privateKey);
+        //     })
+        //     .then(privateKey => {
+        //         logger.debug(`Extracted private key: ${JSON.stringify(privateKey)}`);
+        //         let theKey = new GOSTKey(privateKey);
+        //         if (store) {
+        //             return store._getKeyStore()
+        //                 .then(ks => {
+        //                     ks.putKey(theKey);
+        //                     return theKey;
+        //                 });
+        //         }
+        //         return theKey;
+        //     });
     }
 
     /**
@@ -99,10 +99,13 @@ class GostCryptoSuite extends api.CryptoSuite {
      */
     importKey(pem, opts) {
         logger.debug(`Importing key:\n${pem}\n`);
+        let isCert = pem.indexOf('CERTIFICATE');
         let store = opts ? (opts.ephemeral === false ? this._cryptoKeyStore : undefined) : undefined;
-        let key = GOST_R_34.loadKeyFromPEM(pem);
-        let theKey = new GOSTKey(key.buffer, key.type);
-        if (!!store) {
+        // let key = libGost.loadKeyFromPEM(pem);
+        // logger.debug(`Loaded key: ${JSON.stringify(key)}`);
+        let theKey = new GOSTKey(pem, isCert ? 'public' : 'private' );
+        logger.debug(`Loaded key: ${JSON.stringify(theKey)}`);
+        if (store) {
             return store._getKeyStore()
                 .then(ks => {
                     ks.putKey(theKey);
@@ -124,26 +127,7 @@ class GostCryptoSuite extends api.CryptoSuite {
         logger.debug(`Get key, SKI: ${JSON.stringify(ski)}`);
         return this._cryptoKeyStore._getKeyStore()
             .then(store => {
-                // first try the private key entry, since it encapsulates both
-                // the private key and public key
-                return store.getValue(ski + "-priv")
-                    .then((raw) => {
-                        if (raw !== null) {
-                            const privKey = GOST_R_34.loadKeyFromPEM(raw);
-                            return new GOSTKey(privKey.buffer, "private");
-                        }
-                        // didn't find the private key entry matching the SKI
-                        // next try the public key entry
-                        return store.getValue(ski + "-pub");
-                    }).then((key) => {
-                        if (key instanceof GOSTKey) {
-                            return key;
-                        }
-                        if (key !== null) {
-                            const pubKey = GOST_R_34.loadKeyFromPEM(key);
-                            return new GOSTKey(pubKey.buffer, "public");
-                        }
-                    });
+                return store.get(ski);
             });
     }
 
@@ -174,7 +158,7 @@ class GostCryptoSuite extends api.CryptoSuite {
      * @returns {byte[]} the resulting signature
      */
     sign(key, digest) {
-        let theKey = key.toBytes();
+        let theKey = key.pem;
         let content = Buffer.from(digest);
         let signature = libGost.sign(theKey, content);
         logger.debug(`Signing:`);
@@ -193,7 +177,7 @@ class GostCryptoSuite extends api.CryptoSuite {
      * @returns {boolean} true if the signature verifies successfully
      */
     verify(key, sign, digest) {
-        let theKey = key.toBytes();
+        let theKey = key.pem;
         let content = Buffer.from(digest);
         let signature = new Buffer(sign);
         logger.debug(`Verify:\n\tKEY: ${JSON.stringify(key.type)}\n\tSIGNATURE: ${JSON.stringify(signature)}\n\tDIGEST: ${JSON.stringify(content)}\n`);

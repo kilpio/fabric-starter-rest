@@ -32,8 +32,7 @@ function loadKeyFromPEM(pem) {
     } catch (e1) {
         try {
             let cert = gostCrypto.cert.X509.decode(pem);
-            let key = gostCrypto.asn1.GostSubjectPublicKeyInfo.decode(cert.subjectPublicKeyInfo.encode()).object
-            return key;
+            return gostCrypto.asn1.GostSubjectPublicKeyInfo.decode(cert.subjectPublicKeyInfo.encode()).object
         } catch (e2) {
             throw e1;
         }

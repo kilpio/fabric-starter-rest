@@ -29,7 +29,7 @@ class Util {
             } catch (err) {
                 logger.trace(`Retry attempt: ${nTimes}. Error: `, err);
                 await this.sleep(cfg.CHANNEL_LISTENER_UPDATE_TIMEOUT);
-                return await this.retryOperation(nTimes - 1, fn);
+                return this.retryOperation(--nTimes, fn);
             }
         });
     }

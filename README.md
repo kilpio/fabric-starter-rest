@@ -29,21 +29,6 @@ Serve. Run REST server.
 npm start
 ```
 Build docker image.
-First pull latest base rest image:
-```bash
-docker pull olegabu/fabric-starter-rest:latest-base
-```
-or build if it doesn't exists with `./build-base.sh` (one time for new Hyperledger Fabric version):
-```bash
-cd docker-images
-./build-base.sh latest
-```
-Then build the `fabric-starter-rest` container by using the `./build.sh` script in the `docker-images` folder:
-```bash
-cd docker-images
-./build.sh latest
-```
-or manually:
 ```bash
 docker build -t olegabu/fabric-starter-rest .
 # or
@@ -68,23 +53,6 @@ docker build -t olegabu/fabric-starter-rest:intermediate --build-arg FABRIC_STAR
 docker build -f custom-admin.dockerfile -t olegabu/fabric-starter-rest --build-arg FABRIC_STARTER_VERSION=intermediate --build-arg CUSTOM_SOURCES_TAR=custom-sources.tgz .
 ```
 
-
-#### Use Custom (external) admin dashboard.
-
-Prepare `admin-webapp.tgz` file with built alternate admin webapp, and copy it to `fabric-starter-rest` folder 
-```bash
-cd ../external-admin-webapp
-PUBLIC_URL=/admin npm run build --mode=production
-tar -zcvf admin-webapp.tgz ./build
-cp admin-webapp.tgz ../fabric-starter-rest
-```
-
-Set `USE_EXTERNAL_ADMIN_WEBAPP=true` and use`./build.sh` script from the docker-images folder:
-      
-```bash
-cd docker-images
-USE_EXTERNAL_ADMIN_WEBAPP=true ./build.sh latest
-```
 
 # Connection options
 

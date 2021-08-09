@@ -22,8 +22,7 @@ const GoInt = "longlong";
 
 const libGost = ffi.Library("./lib-fabric-gost.so", {
     Verify: ["bool", [GoString, GoByteArray, GoByteArray]],
-    Sign: [GoInt, [GoString, GoByteArray, GoByteArray]],
-    CSR: [GoInt, [GoString, GoString, GoByteArray]]
+    Sign: [GoInt, [GoString, GoByteArray, GoByteArray]]
 });
 
 const GOST_R_34_11 = 'GOST R 34.11';
@@ -75,19 +74,8 @@ function digest(data) {
     return Hasher.digest(content);
 }
 
-function csr(key, commonName) {
-    let csrBuffer = goByteArray(new Array(65536));
-    let rc = libGost.CSR(goString(key), goString(commonName), csrBuffer.outArray);
-
-    if (rc === SUCCESS) {
-        return csrBuffer.resultArray.toArray();
-    }
-    throw Error(`Could not make CSR:\n\tKEY:${JSON.stringify(key)}\n`);
-}
-
 module.exports = {
     digest: digest,
     sign: sign,
-    csr: csr,
     verify: verify
 };

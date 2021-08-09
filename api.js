@@ -9,7 +9,6 @@ module.exports = function(app, server) {
   const cfg = require('./config.js');
   const logger = cfg.log4js.getLogger('api');
   const util = require('./util');
-  const x509util = require('./util/x509-util');
 
   const channelManager = require('./channel-manager');
   const osnManager = require('./osn-manager');
@@ -26,7 +25,7 @@ module.exports = function(app, server) {
   // fabric client
   const FabricStarterClient = require('./fabric-starter-client');
   const fabricStarterClient = new FabricStarterClient();
-  const appManager = require('./app-manager');
+  const webAppManager = require('./web-app-manager');
 
   // socket.io server to pass blocks to webapps
   const Socket = require('./rest-socket-server');
@@ -105,7 +104,7 @@ module.exports = function(app, server) {
   });
 
   app.post('/cert', (req, res) => {
-    res.json(x509util.decodeCert(req.body.cert));
+    res.json(fabricStarterClient.decodeCert(req.body.cert));
   });
 
   /**
@@ -188,40 +187,23 @@ module.exports = function(app, server) {
    * @returns {object} 200 - User logged in and his JWT returned
    * @returns {Error}  default - Unexpected error
    */
-  app.post('/users', asyncMiddleware(async (req, res, next) => {
+  app.post('/users', asyncMiddleware(async(req, res, next) => {
     // let namePasswordKey=`${req.body.username}.${req.body.password}`;
     // if(!mapFabricStarterClient[namePasswordKey]) {
     // }
     mapFabricStarterClient[req.body.username] && mapFabricStarterClient[req.body.username].logoutUser(req.body.username);
-    mapFabricStarterClient[req.body.username] = new FabricStarterClient();
+    mapFabricStarterClient[req.body.username]=new FabricStarterClient();
     req.fabricStarterClient = mapFabricStarterClient[req.body.username];
     await req.fabricStarterClient.init();
 
     await req.fabricStarterClient.loginOrRegister(req.body.username, req.body.password || req.body.username);
 
-    let certSubject = x509util.getSubject(req.fabricStarterClient.user.getIdentity()._certificate);
-    let jwtPayload = _.assign({sub: req.fabricStarterClient.user.getName()}, certSubject);
-    const token = jsonwebtoken.sign(jwtPayload, jwtSecret, {expiresIn: cfg.AUTH_JWT_EXPIRES_IN});
+    const token = jsonwebtoken.sign({sub: req.fabricStarterClient.user.getName()}, jwtSecret);
     logger.debug('token', token);
     res.json(token);
   }));
 
   /**
-   * Verify JWT token.
-   * @route POST /jwt/verify
-   * @group auth - Authentication and verification
-   * @param {jwt} jwt.body.required
-   * @returns {object} 200 - JWT is correct
-   * @returns {Error}  500  - JWT is malformed or expired
-   */
-  app.post('/jwt/verify', asyncMiddleware(async (req, res, next) => {
-    logger.debug("Verifying JWT Token", req.body);
-    jsonwebtoken.verify(_.get(req,'body.jwt'), jwtSecret);
-    res.status(200);
-    res.json("OK");
-  }));
-
-    /**
    * Query channels joined by the first peer of my organization
    * @route GET /channels
    * @group channels - Queries and operations on channels
@@ -607,7 +589,7 @@ module.exports = function(app, server) {
    * @security JWT
    */
   app.get('/applications', fileUpload, asyncMiddleware(async(req, res, next) => {
-    res.json(await appManager.getWebAppsList());
+    res.json(await webAppManager.getWebAppsList());
   }));
 
   /**
@@ -620,11 +602,12 @@ module.exports = function(app, server) {
    */
   app.post('/applications', fileUpload, asyncMiddleware(async (req, res, next) => {
       let fileUploadObj = _.get(req, "files.file[0]");
-      res.json(await appManager.provisionWebApp(fileUploadObj)
-          .then(appInf => {
-              // let appFolder=path.resolve(extractParentPath, fileBaseName);
-              appManager.redeployWebapp(app, appInf.context, appInf.folder);
-              return appManager.getWebAppsList();
+      const fileBaseName = path.basename(fileUploadObj.originalname, path.extname(fileUploadObj.originalname));
+      res.json(await webAppManager.provisionWebAppFromPackage(fileUploadObj)
+          .then(extractParentPath => {
+              let appFolder=path.resolve(extractParentPath, fileBaseName);
+              webAppManager.redeployWebapp(app, fileBaseName, appFolder);
+              return webAppManager.getWebAppsList();
       }));
   }));
 
@@ -636,39 +619,8 @@ module.exports = function(app, server) {
    * @returns {Error}  default - Unexpected error
    * @security JWT
    */
-  app.get('/appstore/app', fileUpload, asyncMiddleware(async(req, res, next) => {
-    const list = await appManager.getAppstoreList();
-    res.json(list);
-  }));
-
-
-  /**
-   * Deploy new integrated
-   * @route POST /appstore/app
-   * @group appstore - market applications
-   * @param {file} file.formData.required - folder with compiled application archived in zip - eg: coolwebapp.zip
-   * @returns {Error}  default - Unexpected error
-   * @security JWT
-   */
-  app.post('/appstore/app', fileUpload, asyncMiddleware(async (req, res, next) => {
-      let fileUploadObj = _.get(req, "files.file[0]");
-    res.json(await appManager.provisionAppstoreApp(app, fileUploadObj));
-  }));
-
-  app.get('/appstore/status/:appName', fileUpload, asyncMiddleware(async (req, res, next) => {
-    res.json(await appManager.getAppStatus(req.params.appName));
-  }));
-
-
-  /**
-   * Get list of deployed custom middlewares
-   * @route GET /middlewares
-   * @group middlewares - Middlewares
-   * @returns {Error}  default - Unexpected error
-   * @security JWT
-   */
   app.get('/middlewares', fileUpload, asyncMiddleware(async(req, res, next) => {
-      const list = await appManager.getMiddlewareList();
+      const list = await webAppManager.getMiddlewareList();
       res.json(list);
   }));
 
@@ -682,11 +634,11 @@ module.exports = function(app, server) {
    */
   app.post('/middlewares', fileUpload, asyncMiddleware(async (req, res, next) => {
       let fileUploadObj = _.get(req, "files.file[0]");
-      res.json(await appManager.provisionMiddleware(fileUploadObj)
-          .then(() => {
+      res.json(await webAppManager.provisionMiddleware(fileUploadObj)
+          .then(extractParentPath => {
               const route = require(extractParentPath);
               route(app, asyncMiddleware);
-              return appManager.getMiddlewareList();
+              return webAppManager.getMiddlewareList();
       }));
   }));
 

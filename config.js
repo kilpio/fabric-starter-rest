@@ -82,7 +82,6 @@ module.exports = {
 
     WEBAPPS_DIR: process.env.WEBAPPS_DIR || "webapps",
     MIDDLWARE_DIR: process.env.MIDDLWARE_DIR || "./routes",
-    APPSTORE_DIR: process.env.APPSTORE || "./appstore",
 
     UI_LISTEN_BLOCK_OPTS: process.env.UI_LISTEN_BLOCK_OPTS === "true" || process.env.UI_LISTEN_BLOCK_OPTS,
 
@@ -92,7 +91,7 @@ module.exports = {
     CHANNEL_LISTENER_UPDATE_TIMEOUT: process.env.CHANNEL_LISTENER_UPDATE_TIMEOUT ||10000,
     CHAINCODE_PROCESSING_TIMEOUT: process.env.CHAINCODE_PROCESSING_TIMEOUT || 120000,
 
-    INVOKE_RETRY_COUNT: process.env.INVOKE_RETRY_COUNT || 1,
+    INVOKE_RETRY_COUNT: process.env.INVOKE_RETRY_COUNT || 3,
     JOIN_RETRY_COUNT: process.env.JOIN_RETRY_COUNT || 10,
     LISTENER_RETRY_COUNT: process.env.LISTENER_RETRY_COUNT || 20,
 
@@ -102,9 +101,6 @@ module.exports = {
     ORDERER_NAME_PREFIX: ordererNamePrefix,
     ORDERER_BATCH_TIMEOUT: ordererBatchTimeout,
 
-    ACCEPT_ALL_ORGS: process.env.ACCEPT_ALL_ORGS !== 'false',
-
-    CUSTOM_APP_PORTS: process.env.CUSTOM_APP_PORTS || '8080-8089',
     DEFAULT_PEER0PORT: DEFAULT_PEER0PORT,
     HARDCODED_ORDERER_NAME: HARDCODED_ORDERER_NAME,
     AUTH_MODE: process.env.AUTH_MODE || (process.env.CRYPTO_ALGORITHM==='GOST' ? 'ADMIN' : 'CA'),

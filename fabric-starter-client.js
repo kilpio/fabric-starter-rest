@@ -9,6 +9,7 @@ const path = require('path');
 const urlParseLax = require('url-parse-lax');
 const chmodPlus = require('chmod-plus');
 const fabricCLI = require('./fabric-cli');
+const x509 = require('x509');
 const util = require('./util');
 const certsManager = require('./certs-manager');
 const channelManager = require('./channel-manager');
@@ -486,7 +487,7 @@ class FabricStarterClient {
         }
         logger.debug("Proposal", proposal);
 
-        return await util.retryOperation(cfg.INVOKE_RETRY_COUNT, async function () {
+        return util.retryOperation(cfg.INVOKE_RETRY_COUNT, async function () {
             const txId = fsClient.client.newTransactionID(/*true*/);
 
             proposal.txId = txId;
@@ -720,6 +721,9 @@ class FabricStarterClient {
         return connectionOptions;
     }
 
+    decodeCert(cert) {
+        return x509.parseCert(cert);
+    }
 }
 
 module.exports = FabricStarterClient;
