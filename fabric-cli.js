@@ -52,8 +52,8 @@ class FabricCLI {
         if (dir) {
             cmd=`cd ${dir}; ${cmd}`;
         }
-        logger.info(cmd);
-        return shell.exec(`${cmd} 2>&1`, opts);
+        logger.debug(cmd);
+        shell.exec(`${cmd} &2>1`, opts);
     }
 
     async envSubst(templateFile, outputFile, env) {

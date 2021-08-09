@@ -12,7 +12,7 @@ module.exports = function(app, server) {
   const x509util = require('./util/x509-util');
 
   const channelManager = require('./channel-manager');
-  const integrationService = require('./service/integration-service');
+  const osnManager = require('./osn-manager');
 
   // upload for chaincode and app installation
   const uploadDir = os.tmpdir() || './upload';
@@ -81,7 +81,7 @@ module.exports = function(app, server) {
 
 // require presence of JWT in Authorization Bearer header
   const jwtSecret = fabricStarterClient.getSecret();
-  app.use(jwt({secret: jwtSecret}).unless({path: ['/', '/users', /\/jwt\/.*/, '/domain', '/mspid', '/config', new RegExp('/api-docs'), '/api-docs.json', /\/webapp/, /\/webapps\/.*/,'/admin/', /\/admin\/.*/, '/msp/', /\/integration\/.*/]}));
+  app.use(jwt({secret: jwtSecret}).unless({path: ['/', '/users', '/domain', '/mspid', '/config', new RegExp('/api-docs'), '/api-docs.json', /\/webapp/, /\/webapps\/.*/,'/admin/', /\/admin\/.*/, '/msp/', /\/integration\/.*/]}));
 
 // use fabricStarterClient for every logged in user
   const mapFabricStarterClient = {};
@@ -365,50 +365,51 @@ module.exports = function(app, server) {
    */
   app.get('/network/orgs', asyncMiddleware(async(req, res, next) => {
     let storedOrgs = await req.fabricStarterClient.query(cfg.DNS_CHANNEL, cfg.DNS_CHAINCODE, "get", '["orgs"]');
-    let orgsArray =_.values(JSON.parse(_.get(storedOrgs,'[0]')||'[]'));
+    let orgsArray =_.values(JSON.parse(_.get(storedOrgs,"[0]")));
     res.json(orgsArray);
   }));
 
-  app.post('/service/accept/orgs', asyncMiddleware(async (req, res) => {
-    res.json(integrationService.acceptOrg(req.body))
+
+  app.post('/service/accept/orgs', asyncMiddleware((req, res) => {
+    logger.info('Orgs to service request: ', req.body);
+    let orgMspIdsArray = _.isArray(req.body) ? req.body : [req.body];
+    this.orgsToAccept = _.concat(this.orgsToAccept || [], orgMspIdsArray);
+    res.json("OK")
   }));
 
   app.get('/service/accepted/orgs', asyncMiddleware((req, res) =>{
-    res.json(integrationService.acceptedOrgsList());
+    res.json(this.orgsToAccept || []);
   }));
 
   app.post('/integration/service/orgs', asyncMiddleware(async (req, res) => {
-    logger.info('Org integration service request: ', req.body);
-    try {
-      res.json(await integrationService.integrateOrg(orgFromHttpBody(req.body)))
-    } catch (e) {
-      logger.error(e);
-      res.status(401).json(e);
+    logger.info('Integration service request: ', req.body);
+    let org = orgFromHttpBody(req.body);
+    if (!this.orgsToAccept || _.find(this.orgsToAccept, o => o.orgId === org.orgId)) {
+      let client = await createDefaultFabricClient();
+      return res.json(await client.addOrgToChannel(cfg.DNS_CHANNEL, org));
     }
-  }));
-
-  app.post('/integration/dns/org', asyncMiddleware(async (req, res) => {
-    logger.info('Dns integration service request: ', req.body);
-    try {
-      res.json(await integrationService.registerOrgInDns(orgFromHttpBody(req.body)))
-    } catch (e) {
-      logger.error(e);
-      res.status(401).json(e);
-    }
+    res.status(301).json(`Org ${org.orgId} is not allowed`);
   }));
 
   app.post('/integration/service/raft', asyncMiddleware(async (req, res, next) => {
     logger.info('Raft integration service request: ', req.body);
-    try {
-      res.json(await integrationService.integrateOrderer(ordererFromHttpBody(req.body)))
-    } catch (e) {
-      logger.error(e);
-      res.status(401).json(e);
+    let orderer = ordererFromHttpBody(req.body);
+    if (!this.orgsToAccept || _.find(this.orgsToAccept, o=>o.domain===orderer.domain)) {
+      let client = await createDefaultFabricClient();
+      return res.json(await osnManager.OsnManager.addRaftConsenter(orderer, client));
     }
+    res.status(301).json(`Orderer domain ${orderer.domain} is not allowed`);
   }));
 
+  async function createDefaultFabricClient() {
+    let client = new FabricStarterClient();
+    await client.init();
+    await client.loginOrRegister(cfg.enrollId, cfg.enrollSecret);
+    return client;
+  }
+
   function orgFromHttpBody(body) {
-    let org = {orgId: body.orgId, domain: body.domain || cfg.domain, orgIp: body.orgIp, peer0Port: body.peerPort, wwwPort: body.wwwPort};
+    let org = {orgId: body.orgId, domain: body.domain, orgIp: body.orgIp, peer0Port: body.peerPort, wwwPort: body.wwwPort};
     logger.info('Org: ', org);
 
     return org;
@@ -417,7 +418,7 @@ module.exports = function(app, server) {
   function ordererFromHttpBody(body) {
     let orderer = {
       ordererName: body.ordererName, domain: body.domain, ordererPort: body.ordererPort,
-      ordererIp: body.ordererIp, wwwPort: body.wwwPort, orgId: body.orgId, orgIp: body.ordererIp
+      ordererIp: body.ordererIp, wwwPort: body.wwwPort
     };
     logger.info('Orderer: ', orderer);
     return orderer;
